@@ -20,26 +20,20 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
       https.get(
         {
           host: "api.darksky.net",
-          path: "/forecast/" + darkSkyApiKey + "/" + event.latLng
-        }, 
-        // (res) => {
-        //   let payload = ''
-        //   res.on('data', (data) => {
-        //     payload += data
-        //     resolve(payload)
-        //   })
-        // })
-       (res) => {
-        let payload = ''
-        res.on('data', (data) => {
-         payload += data
-        })
-        res.on('end', data => {
-         resolve(payload)
-        })
-       }
+          path: "/forecast/" + darkSkyApiKey + "/40.75658383859137,-73.83024611523439"
+        },
+        (res) => {
+          let payload = ''
+
+          res.on('data', (data) => {
+            payload += data
+          })
+          res.on('end', data => {
+            resolve(payload)
+          })
+        }
       ).on('error', err => {
-       console.log(err)
+        console.log(err)
       })
     })
   }
@@ -49,7 +43,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
     s3.putObject(
       {
         Bucket: "wx-aggregator",
-        Key: "forecastResults.json",
+        Key: "/forecast_data/darksky/forecastResults.json",
         Body: weatherJSONData
       }, 
       (err) => {
@@ -72,7 +66,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
             createNewJSONOfLatestWeatherDataInS3(
               {
                 Bucket: "wx-aggregator",
-                Key: "forecastResults.json",
+                Key: "/forecast_data/darksky/forecastResults.json",
                 Body: weatherJSONData
               },
               weatherJSONData)
@@ -90,7 +84,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
               createNewJSONOfLatestWeatherDataInS3(
                 {
                   Bucket: "wx-aggregator",
-                  Key: "forecastResults.json",
+                  Key: "/forecast_data/darksky/forecastResults.json",
                   Body: weatherJSONData
                 },
                 weatherJSONData
