@@ -25,11 +25,33 @@ provider:
 
 # you can add statements to the Lambda function's IAM Role here
 iamRoleStatements:
-  - Effect: Allow
+  - Effect: "Allow"
     Action:
-      - s3:PutObject
-      - s3:GetObject
-    Resource: "arn:aws:s3:::wx-aggregator/*"
+      - "s3:GetObject"
+    Resource:
+      Fn::Join:
+        - ""
+        - - "arn:aws:s3:::"
+        - Ref: "wx-aggregator"
+        - "/*"
+  - Effect: "Allow"
+    Action:
+    - "s3:PutObject"
+    Resource:
+      Fn::Join:
+        - ""
+        - - "arn:aws:s3:::"
+        - Ref: "wx-aggregator"
+        - "/*"
+
+# iamRoleStatements:
+#   - Effect: Allow
+#     Action:
+#       - s3:PutObject
+#       - s3:GetObject
+#     Resource:
+#           ]\\[- { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}     
+#       - "arn:aws:s3:::*"
 
 # you can define service wide environment variables here
 #  environment:

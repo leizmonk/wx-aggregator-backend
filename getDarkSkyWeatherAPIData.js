@@ -48,7 +48,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
       }, 
       (err) => {
         if (err) {
-          console.log(`Error uploading weather API data to S3 json file: ${err}`)
+          console.log(`Error uploading weather API data to S3 json file: ${err, err.stack}`)
           throw err
         } else {
           console.log("Successfully uploaded latest weather data to JSON")
