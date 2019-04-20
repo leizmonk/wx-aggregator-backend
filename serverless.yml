@@ -21,28 +21,31 @@ provider:
   name: aws
   runtime: nodejs8.10
   stage: dev
-  region: us-west-2  
+  region: us-west-2
 
 # you can add statements to the Lambda function's IAM Role here
-iamRoleStatements:
-  - Effect: "Allow"
-    Action:
-      - "s3:GetObject"
-    Resource:
-      Fn::Join:
-        - ""
-        - - "arn:aws:s3:::"
-        - Ref: "wx-aggregator"
-        - "/*"
-  - Effect: "Allow"
-    Action:
-    - "s3:PutObject"
-    Resource:
-      Fn::Join:
-        - ""
-        - - "arn:aws:s3:::"
-        - Ref: "wx-aggregator"
-        - "/*"
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - s3:GetObject
+        - s3:ListBucket
+        - s3:PutObject
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - ec2:CreateNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+        - ec2:DetachNetworkInterface
+        - ec2:DeleteNetworkInterface
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - lambda:InvokeFunction
+        - lambda:InvokeAsync
+      Resource: "*"
 
 # iamRoleStatements:
 #   - Effect: Allow

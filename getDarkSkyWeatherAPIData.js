@@ -4,6 +4,7 @@ const AWS = require("aws-sdk")
 AWS.config.update({region:'us-west-2'})
 const Promise = require("bluebird")
 const lambda = new AWS.Lambda()
+const moment = require("moment")
 const util = require("util")
 const inspect = util.inspect
 const darkSkyApiKey = process.env.darkSkyApiKey
@@ -12,6 +13,39 @@ const s3 = new AWS.S3()
 const params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
 module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
+  async function checkForExistingForecast(zip, reactTimestamp) {
+    // Look in wx-aggregator/forecast_data, iteratively check weather service folders
+    // in each weather service folder, check if ZIP.json exists
+    const zipcodeJsonKey = zip + ".json";
+    let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
+    let forecast;
+    let forecastLastModified;
+
+    // Check if S3 already has forecast data across all services for that zipcode
+    await s3.getObject({
+      Bucket: "wx-aggregator",
+      Key: `forecast_data/${weatherService}/${zipcodeJsonKey}` // TODO: Iterative over multiple weather forecasters
+    }, (err, data) => {
+      if (err) {
+        console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
+      } else {
+        forecast = data.Body;
+        forecastLastModified = data.LastModified;
+      }
+    });
+
+    if (
+      forecast && 
+      moment(reactTimestamp).isBefore(moment(forecastLastModified).add(6, 'hours'))
+    ) { // Six hours from when search submit occurs in React app
+      return forecast;
+    } else {
+      forecast = await fetchDarkSkyAPIData(); // TODO: Iterative over multiple wather forecasters
+      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast);
+      return forecast;
+    }
+  }
+
   // TODO: First, inspect event object and see where the zipcode and timestamp
   console.log(`*** OBJECT CONTAINING ZIP CODE AND TIMESTAMP: ${inspect(event)} ***`)  
   
@@ -43,7 +77,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
     s3.putObject(
       {
         Bucket: "wx-aggregator",
-        Key: "/forecast_data/darksky/forecastResults.json",
+        Key: "forecast_data/darksky/forecastResults.json",
         Body: weatherJSONData
       }, 
       (err) => {
@@ -66,7 +100,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
             createNewJSONOfLatestWeatherDataInS3(
               {
                 Bucket: "wx-aggregator",
-                Key: "/forecast_data/darksky/forecastResults.json",
+                Key: "forecast_data/darksky/forecastResults.json",
                 Body: weatherJSONData
               },
               weatherJSONData)
@@ -84,7 +118,7 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
               createNewJSONOfLatestWeatherDataInS3(
                 {
                   Bucket: "wx-aggregator",
-                  Key: "/forecast_data/darksky/forecastResults.json",
+                  Key: "forecast_data/darksky/forecastResults.json",
                   Body: weatherJSONData
                 },
                 weatherJSONData
@@ -104,3 +138,5 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
     callback(err)
   }
 }
+
+
