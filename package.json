@@ -27,6 +27,7 @@
   "homepage": "https://github.com/leizmonk/wx-aggregator-backend#readme",
   "dependencies": {
     "aws-sdk": "^2.409.0",
-    "bluebird": "3.5.4"
+    "bluebird": "3.5.4",
+    "moment": "2.24.0"
   }
 }

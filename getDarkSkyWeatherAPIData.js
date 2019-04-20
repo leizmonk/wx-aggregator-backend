@@ -10,14 +10,16 @@ const inspect = util.inspect
 const darkSkyApiKey = process.env.darkSkyApiKey
 
 const s3 = new AWS.S3()
-const params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
+const s3Params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
-module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
-  async function checkForExistingForecast(zip, reactTimestamp) {
+module.exports.getDarkSkyWeatherAPIData = ({latLng, zipCode, time}, context, callback) => {
+  console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(latLng, zipCode, time)} ***`)  
+  let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
+  const zipcodeJsonKey = zipCode + ".json";
+
+  async function checkForExistingForecast(latLng, zipCode, time) {
     // Look in wx-aggregator/forecast_data, iteratively check weather service folders
-    // in each weather service folder, check if ZIP.json exists
-    const zipcodeJsonKey = zip + ".json";
-    let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
+    // in each weather service folder, check if zipCode.json exists
     let forecast;
     let forecastLastModified;
 
@@ -34,27 +36,23 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
       }
     });
 
-    if (
-      forecast && 
-      moment(reactTimestamp).isBefore(moment(forecastLastModified).add(6, 'hours'))
-    ) { // Six hours from when search submit occurs in React app
+    // If forecast data exists and is less than 6 hours older than search event in React app
+    if (forecast && moment(time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
+      console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
       return forecast;
     } else {
-      forecast = await fetchDarkSkyAPIData(); // TODO: Iterative over multiple wather forecasters
-      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast);
+      forecast = await fetchDarkSkyAPIData(latLng); // TODO: Iterative over multiple wather forecasters
+      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast, zipCode);
       return forecast;
     }
   }
-
-  // TODO: First, inspect event object and see where the zipcode and timestamp
-  console.log(`*** OBJECT CONTAINING ZIP CODE AND TIMESTAMP: ${inspect(event)} ***`)  
   
-  function fetchDarkSkyAPIData () {
+  function fetchDarkSkyAPIData (latLng) {
     return new Promise((resolve, reject) => {
       https.get(
         {
           host: "api.darksky.net",
-          path: "/forecast/" + darkSkyApiKey + "/40.75658383859137,-73.83024611523439"
+          path: "/forecast/" + darkSkyApiKey + latLng
         },
         (res) => {
           let payload = ''
@@ -72,13 +70,15 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
     })
   }
 
-  function createNewJSONOfLatestWeatherDataInS3(s3Params, weatherJSONData) {
+  // needs to ingest ZIP to create the zip.json, weather service vars
+  function createNewJSONOfLatestDataInS3(s3Params, weatherJSONData, zipCode) {
     console.log(`Fetched raw payload from external API: ${weatherJSONData}`)
     s3.putObject(
       {
         Bucket: "wx-aggregator",
-        Key: "forecast_data/darksky/forecastResults.json",
-        Body: weatherJSONData
+        // Key needs to be forecast_data/{weather service}/{zipCode}.json
+        Key: `forecast_data/${weatherService}/${zipcodeJsonKey}`,
+        Body: JSON.stringify(weatherJSONData)
       }, 
       (err) => {
         if (err) {
@@ -91,52 +91,51 @@ module.exports.getDarkSkyWeatherAPIData = (event, context, callback) => {
     )
   }
 
-  try {
-    fetchDarkSkyAPIData()
-      .then((weatherJSONData) => {
-        return s3.getObject(params, (err, data) => {
-          if (err) {
-            // weather data json file doesn"t exist, create it and write to it
-            createNewJSONOfLatestWeatherDataInS3(
-              {
-                Bucket: "wx-aggregator",
-                Key: "forecast_data/darksky/forecastResults.json",
-                Body: weatherJSONData
-              },
-              weatherJSONData)
-              let response = 
-              callback(null, {
-                statusCode: 200,
-                headers: {
-                  "x-custom-header" : "hey ma look no hands"
-                },
-                body: JSON.stringify(weatherJSONData)      
-              })
-          } else {
-            console.log('Existing JSON detected. Deleting Old Weather Data...')
-              // Insert latest data in a new file on the s3 bucket
-              createNewJSONOfLatestWeatherDataInS3(
-                {
-                  Bucket: "wx-aggregator",
-                  Key: "forecast_data/darksky/forecastResults.json",
-                  Body: weatherJSONData
-                },
-                weatherJSONData
-              )
-              callback(null, {
-                statusCode: 200,
-                headers: {
-                  "x-custom-header" : "hey ma look no hands"
-                },
-                body: JSON.stringify(weatherJSONData)      
-              });
-          }
-        })
-    })
-  }
-  catch(err) {
-    callback(err)
-  }
+  checkForExistingForecast(zipCode, time);
+  // try {
+  //   fetchDarkSkyAPIData()
+  //     .then((weatherJSONData) => {
+  //       return s3.getObject(params, (err, data) => {
+  //         if (err) {
+  //           // weather data json file doesn"t exist, create it and write to it
+  //           createNewJSONOfLatestWeatherDataInS3(
+  //             {
+  //               Bucket: "wx-aggregator",
+  //               Key: "forecast_data/darksky/forecastResults.json",
+  //               Body: weatherJSONData
+  //             },
+  //             weatherJSONData)
+  //             let response = 
+  //             callback(null, {
+  //               statusCode: 200,
+  //               headers: {
+  //                 "x-custom-header" : "hey ma look no hands"
+  //               },
+  //               body: JSON.stringify(weatherJSONData)
+  //             })
+  //         } else {
+  //           console.log('Existing JSON detected. Deleting Old Weather Data...')
+  //             // Insert latest data in a new file on the s3 bucket
+  //             createNewJSONOfLatestWeatherDataInS3(
+  //               {
+  //                 Bucket: "wx-aggregator",
+  //                 Key: "forecast_data/darksky/forecastResults.json",
+  //                 Body: weatherJSONData
+  //               },
+  //               weatherJSONData
+  //             )
+  //             callback(null, {
+  //               statusCode: 200,
+  //               headers: {
+  //                 "x-custom-header" : "hey ma look no hands"
+  //               },
+  //               body: JSON.stringify(weatherJSONData)      
+  //             });
+  //         }
+  //       })
+  //   })
+  // }
+  // catch(err) {
+  //   callback(err)
+  // }
 }
-
-
