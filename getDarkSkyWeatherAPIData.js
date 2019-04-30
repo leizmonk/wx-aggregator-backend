@@ -1,23 +1,23 @@
 "use strict";
-const https = require("https")
 const AWS = require("aws-sdk")
 AWS.config.update({region:'us-west-2'})
-const Promise = require("bluebird")
+const https = require("https")
 const lambda = new AWS.Lambda()
 const moment = require("moment")
+const Promise = require("bluebird")
 const util = require("util")
 const inspect = util.inspect
-const darkSkyApiKey = process.env.darkSkyApiKey
 
+const darkSkyApiKey = process.env.darkSkyApiKey
 const s3 = new AWS.S3()
 const s3Params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
-module.exports.getDarkSkyWeatherAPIData = ({latLng, zipCode, time}, context, callback) => {
-  console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(latLng, zipCode, time)} ***`)  
+module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
+  console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
   let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
-  const zipcodeJsonKey = zipCode + ".json";
+  const zipcodeJsonKey = reactInput.zipCode + ".json";
 
-  async function checkForExistingForecast(latLng, zipCode, time) {
+  async function checkForExistingForecast(reactInput) {
     // Look in wx-aggregator/forecast_data, iteratively check weather service folders
     // in each weather service folder, check if zipCode.json exists
     let forecast;
@@ -41,27 +41,27 @@ module.exports.getDarkSkyWeatherAPIData = ({latLng, zipCode, time}, context, cal
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
       return forecast;
     } else {
-      forecast = await fetchDarkSkyAPIData(latLng); // TODO: Iterative over multiple wather forecasters
-      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast, zipCode);
+      forecast = await fetchDarkSkyAPIData(reactInput); // TODO: Iterative over multiple wather forecasters
+      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast, reactInput.zipCode);
       return forecast;
     }
   }
   
-  function fetchDarkSkyAPIData (latLng) {
+  function fetchDarkSkyAPIData (reactInput) {
     return new Promise((resolve, reject) => {
       https.get(
         {
           host: "api.darksky.net",
-          path: "/forecast/" + darkSkyApiKey + latLng
+          path: "/forecast/" + darkSkyApiKey + reactInput.latLng
         },
         (res) => {
-          let payload = ''
+          let apiPayload = ''
 
           res.on('data', (data) => {
-            payload += data
+            apiPayload += data
           })
           res.on('end', data => {
-            resolve(payload)
+            resolve(apiPayload)
           })
         }
       ).on('error', err => {
@@ -71,7 +71,7 @@ module.exports.getDarkSkyWeatherAPIData = ({latLng, zipCode, time}, context, cal
   }
 
   // needs to ingest ZIP to create the zip.json, weather service vars
-  function createNewJSONOfLatestDataInS3(s3Params, weatherJSONData, zipCode) {
+  function createNewJSONOfLatestDataInS3(s3Params, weatherJSONData) {
     console.log(`Fetched raw payload from external API: ${weatherJSONData}`)
     s3.putObject(
       {
@@ -91,7 +91,8 @@ module.exports.getDarkSkyWeatherAPIData = ({latLng, zipCode, time}, context, cal
     )
   }
 
-  checkForExistingForecast(zipCode, time);
+  checkForExistingForecast();
+
   // try {
   //   fetchDarkSkyAPIData()
   //     .then((weatherJSONData) => {
