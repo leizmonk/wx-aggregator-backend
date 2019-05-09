@@ -52,7 +52,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
       https.get(
         {
           host: "api.darksky.net",
-          path: "/forecast/" + darkSkyApiKey + reactInput.latLng
+          path: "/forecast/" + darkSkyApiKey + '/' + reactInput.latLng
         },
         (res) => {
           let apiPayload = ''
@@ -91,7 +91,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     )
   }
 
-  checkForExistingForecast();
+  checkForExistingForecast(reactInput);
 
   // try {
   //   fetchDarkSkyAPIData()
