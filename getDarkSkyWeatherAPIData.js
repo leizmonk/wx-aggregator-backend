@@ -13,7 +13,7 @@ const s3 = new AWS.S3()
 const s3Params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
 module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
-  console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
+  // console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
   let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
   const zipcodeJsonKey = reactInput.zipCode + ".json";
 
