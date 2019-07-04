@@ -31,13 +31,18 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
       if (err) {
         console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
       } else {
+        console.log('THIS BE THE ZIPCODE KEY::::::: ', zipcodeJsonKey)
+        console.log('THIS BE THE TIMESTAMP:::::::::::', data.LastModified)
         forecast = data.Body;
         forecastLastModified = data.LastModified;
       }
     });
 
+    console.log('submitted timestamp: ', reactInput.time)
+    console.log('obj last modified timestamp: ', forecastLastModified)
+
     // If forecast data exists and is less than 6 hours older than search event in React app
-    if (forecast && moment(time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
+    if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
       return forecast;
     } else {
