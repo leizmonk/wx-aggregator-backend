@@ -13,17 +13,20 @@ const s3 = new AWS.S3()
 const s3Params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
 module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
-  // console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
+  console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
   let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
   const zipcodeJsonKey = reactInput.zipCode + ".json";
+  let functionFires = 0;
 
   async function checkForExistingForecast(reactInput) {
     // Look in wx-aggregator/forecast_data, iteratively check weather service folders
     // in each weather service folder, check if zipCode.json exists
     let forecast;
     let forecastLastModified;
+    let payload;
 
     // Check if S3 already has forecast data across all services for that zipcode
+    // TODO: why is this logging twice
     await s3.getObject({
       Bucket: "wx-aggregator",
       Key: `forecast_data/${weatherService}/${zipcodeJsonKey}` // TODO: Iterative over multiple weather forecasters
@@ -36,10 +39,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
         forecast = data.Body;
         forecastLastModified = data.LastModified;
       }
-    });
-
-    console.log('submitted timestamp: ', reactInput.time)
-    console.log('obj last modified timestamp: ', forecastLastModified)
+    }).promise();
 
     // If forecast data exists and is less than 6 hours older than search event in React app
     if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
