@@ -5,53 +5,55 @@ const https = require("https")
 const lambda = new AWS.Lambda()
 const moment = require("moment")
 const Promise = require("bluebird")
+const s3 = new AWS.S3()
 const util = require("util")
 const inspect = util.inspect
 
 const darkSkyApiKey = process.env.darkSkyApiKey
-const s3 = new AWS.S3()
-const s3Params = {params: {Bucket: "wx-aggregator", Key: "darkSkyWeatherData"}}
 
 module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
   let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
-  const zipcodeJsonKey = reactInput.zipCode + ".json";
-  let functionFires = 0;
+  let forecast;
+  let forecastLastModified;
+  let payload;
 
-  async function checkForExistingForecast(reactInput) {
+  const zipcodeJsonKey = reactInput.zipCode + ".json";
+  const s3PutParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}`}
+  const s3GetParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}/${zipcodeJsonKey}`}  
+
+  async function checkForExistingForecast(forecast, forecastLastModified, reactInput) {
     // Look in wx-aggregator/forecast_data, iteratively check weather service folders
     // in each weather service folder, check if zipCode.json exists
-    let forecast;
-    let forecastLastModified;
-    let payload;
 
     // Check if S3 already has forecast data across all services for that zipcode
     // TODO: why is this logging twice
-    await s3.getObject({
-      Bucket: "wx-aggregator",
-      Key: `forecast_data/${weatherService}/${zipcodeJsonKey}` // TODO: Iterative over multiple weather forecasters
-    }, (err, data) => {
-      if (err) {
-        console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
-      } else {
+    await s3.getObject(s3GetParams, (err, data) => {
+      try {
         console.log('THIS BE THE ZIPCODE KEY::::::: ', zipcodeJsonKey)
-        console.log('THIS BE THE TIMESTAMP:::::::::::', data.LastModified)
-        forecast = data.Body;
-        forecastLastModified = data.LastModified;
+        console.log('THIS BE THE TIMESTAMP:::::::::::', data ? data.LastModified : 'forecast not saved yet')
+        forecast = data ? data.Body : null
+        forecastLastModified = data ? data.LastModified : null
+        return (forecast, forecastLastModified)
+      } catch (err) {
+        console.log('ERROR WAS::::::', err, err.stack)
+        console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
       }
-    }).promise();
-
+    }).promise()
+  }
+  
+  async function checkForecastStaleness(forecast, forecastLastModified, reactInput) {
     // If forecast data exists and is less than 6 hours older than search event in React app
     if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
       return forecast;
     } else {
-      forecast = await fetchDarkSkyAPIData(reactInput); // TODO: Iterative over multiple wather forecasters
-      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3Params, forecast, reactInput.zipCode);
+      forecast = await fetchDarkSkyAPIData(reactInput); // TODO: Iterative over multiple weather forecasters
+      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3PutParams, forecast, reactInput.zipCode);
       return forecast;
-    }
+    }    
   }
-  
+
   function fetchDarkSkyAPIData (reactInput) {
     return new Promise((resolve, reject) => {
       https.get(
@@ -76,7 +78,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   }
 
   // needs to ingest ZIP to create the zip.json, weather service vars
-  function createNewJSONOfLatestDataInS3(s3Params, weatherJSONData) {
+  function createNewJSONOfLatestDataInS3(s3PutParams, weatherJSONData, zipCode) {
     console.log(`Fetched raw payload from external API: ${weatherJSONData}`)
     s3.putObject(
       {
@@ -96,7 +98,14 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     )
   }
 
-  checkForExistingForecast(reactInput);
+  checkForExistingForecast(reactInput).catch(function(e) {
+    // ignore error
+  }).then((forecast, forecastLastModified, reactInput) => {
+    checkForecastStaleness(forecast, forecastLastModified, reactInput)
+    console.log('after a catch the chain is restored');
+  }, () => {
+    console.log('Not fired due to the catch');
+  });
 
   // try {
   //   fetchDarkSkyAPIData()
