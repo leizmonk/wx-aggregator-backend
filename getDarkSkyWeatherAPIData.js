@@ -22,19 +22,18 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   const s3PutParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}`}
   const s3GetParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}/${zipcodeJsonKey}`}  
 
-  async function checkForExistingForecast(forecast, forecastLastModified, reactInput) {
+  async function checkForExistingForecast(reactInput, forecast, forecastLastModified) {
     // Look in wx-aggregator/forecast_data, iteratively check weather service folders
     // in each weather service folder, check if zipCode.json exists
 
     // Check if S3 already has forecast data across all services for that zipcode
-    // TODO: why is this logging twice
+    // TODO: why is this logging twice, only catch on "NoSuchKey"
     await s3.getObject(s3GetParams, (err, data) => {
       try {
-        console.log('THIS BE THE ZIPCODE KEY::::::: ', zipcodeJsonKey)
-        console.log('THIS BE THE TIMESTAMP:::::::::::', data ? data.LastModified : 'forecast not saved yet')
         forecast = data ? data.Body : null
         forecastLastModified = data ? data.LastModified : null
-        return (forecast, forecastLastModified)
+        console.log(forecast)
+        console.log(forecastLastModified)
       } catch (err) {
         console.log('ERROR WAS::::::', err, err.stack)
         console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
@@ -42,7 +41,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     }).promise()
   }
   
-  async function checkForecastStaleness(forecast, forecastLastModified, reactInput) {
+  async function checkForecastStaleness(reactInput, forecast, forecastLastModified) {
     // If forecast data exists and is less than 6 hours older than search event in React app
     if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
@@ -54,7 +53,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     }    
   }
 
-  function fetchDarkSkyAPIData (reactInput) {
+  function fetchDarkSkyAPIData(reactInput) {
     return new Promise((resolve, reject) => {
       https.get(
         {
@@ -98,10 +97,10 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     )
   }
 
-  checkForExistingForecast(reactInput).catch(function(e) {
-    // ignore error
-  }).then((forecast, forecastLastModified, reactInput) => {
-    checkForecastStaleness(forecast, forecastLastModified, reactInput)
+  checkForExistingForecast(reactInput).catch((e) => {
+    // ignore
+  }).then((forecast, forecastLastModified) => {
+    checkForecastStaleness(reactInput, forecast, forecastLastModified)
     console.log('after a catch the chain is restored');
   }, () => {
     console.log('Not fired due to the catch');
