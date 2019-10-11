@@ -1,0 +1,33 @@
+{
+  "name": "wx-aggregator-backend",
+  "version": "0.0.1",
+  "description": "serverless backend support for wx-aggregator client",
+  "main": "getDarkSkyWeatherAPIData.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leizmonk/wx-aggregator-backend.git"
+  },
+  "keywords": [
+    "weather",
+    "forecasting",
+    "serveerless",
+    "node",
+    "aws",
+    "s3",
+    "lambda"
+  ],
+  "author": "Lei Zhao",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/leizmonk/wx-aggregator-backend/issues"
+  },
+  "homepage": "https://github.com/leizmonk/wx-aggregator-backend#readme",
+  "dependencies": {
+    "aws-sdk": "^2.409.0",
+    "bluebird": "3.5.4",
+    "moment": "2.24.0"
+  }
+}
