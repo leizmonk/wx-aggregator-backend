@@ -1,4 +1,4 @@
-"use strict";
+"use strict"
 const AWS = require("aws-sdk")
 AWS.config.update({region:'us-west-2'})
 const https = require("https")
@@ -13,12 +13,12 @@ const darkSkyApiKey = process.env.darkSkyApiKey
 
 module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   console.log(`*** OBJECT CONTAINING ZIP CODE, LATLNG, TIMESTAMP: ${inspect(reactInput)} ***`)  
-  let weatherService = 'darksky'; // TODO: Make a for loop for N weather services
-  let forecast;
-  let forecastLastModified;
-  let payload;
+  let weatherService = 'darksky' // TODO: Make a for loop for N weather services
+  let forecast
+  let forecastLastModified
+  let payload
 
-  const zipcodeJsonKey = reactInput.zipCode + ".json";
+  const zipcodeJsonKey = reactInput.zipCode + ".json"
   const s3PutParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}`}
   const s3GetParams = {Bucket: "wx-aggregator", Key: `forecast_data/${weatherService}/${zipcodeJsonKey}`}  
 
@@ -27,29 +27,32 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     // in each weather service folder, check if zipCode.json exists
 
     // Check if S3 already has forecast data across all services for that zipcode
-    // TODO: why is this logging twice, only catch on "NoSuchKey"
-    await s3.getObject(s3GetParams, (err, data) => {
-      try {
-        forecast = data ? data.Body : null
-        forecastLastModified = data ? data.LastModified : null
-        console.log(forecast)
-        console.log(forecastLastModified)
-      } catch (err) {
+    return await s3.getObject(s3GetParams, (err, data) => {
+      if (err) {
         console.log('ERROR WAS::::::', err, err.stack)
-        console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`);
+        console.log(`Forecast for that JSON not found, downloading forecast for that zipcode from ${weatherService} weather service.`)
+      } else {
+        return data
       }
     }).promise()
   }
   
-  async function checkForecastStaleness(reactInput, forecast, forecastLastModified) {
+  async function checkForecastStaleness(reactInput, data) {
+    forecast = data ? data.Body : null
+    forecastLastModified = data ? data.LastModified : null
+
+    console.log('forecast?, ', forecast)
+    console.log('react event time?, ', reactInput.time)
+    console.log('last modified?, ', forecastLastModified)
+
     // If forecast data exists and is less than 6 hours older than search event in React app
     if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
-      return forecast;
+      return forecast
     } else {
-      forecast = await fetchDarkSkyAPIData(reactInput); // TODO: Iterative over multiple weather forecasters
-      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3PutParams, forecast, reactInput.zipCode);
-      return forecast;
+      forecast = await fetchDarkSkyAPIData(reactInput) // TODO: Iterative over multiple weather forecasters
+      let uploadJsonResponse = await createNewJSONOfLatestDataInS3(s3PutParams, forecast, reactInput.zipCode)
+      return forecast
     }    
   }
 
@@ -98,13 +101,13 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   }
 
   checkForExistingForecast(reactInput).catch((e) => {
-    // ignore
-  }).then((forecast, forecastLastModified) => {
-    checkForecastStaleness(reactInput, forecast, forecastLastModified)
-    console.log('after a catch the chain is restored');
+    // TODO: only ignore "NoSuchKey" errors, others should be caught    
+  }).then((data) => {
+    checkForecastStaleness(reactInput, data)
+    console.log('after a catch the chain is restored')
   }, () => {
-    console.log('Not fired due to the catch');
-  });
+    console.log('Not fired due to the catch')
+  })
 
   // try {
   //   fetchDarkSkyAPIData()
@@ -144,7 +147,7 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
   //                 "x-custom-header" : "hey ma look no hands"
   //               },
   //               body: JSON.stringify(weatherJSONData)      
-  //             });
+  //             })
   //         }
   //       })
   //   })
