@@ -41,10 +41,6 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     forecast = data ? data.Body : null
     forecastLastModified = data ? data.LastModified : null
 
-    console.log('forecast?, ', forecast)
-    console.log('react event time?, ', reactInput.time)
-    console.log('last modified?, ', forecastLastModified)
-
     // If forecast data exists and is less than 6 hours older than search event in React app
     if (forecast && moment(reactInput.time).isBefore(moment(forecastLastModified).add(6, 'hours'))) {
       console.log('Forecast for this ZIP already exists, and is less than 6 hours old')
@@ -104,9 +100,6 @@ module.exports.getDarkSkyWeatherAPIData = (reactInput, context, callback) => {
     // TODO: only ignore "NoSuchKey" errors, others should be caught    
   }).then((data) => {
     checkForecastStaleness(reactInput, data)
-    console.log('after a catch the chain is restored')
-  }, () => {
-    console.log('Not fired due to the catch')
   })
 
   // try {
